@@ -5,8 +5,8 @@
 
 #include "trust_anchors.h"
 
-#define IOTF_BROKER       ""
-#define IOTF_PORT         8883
+#define IOTF_BROKER "mqtt.iaintegracion.space"
+#define IOTF_PORT   8883
 #define IOTF_DEVICE_ID    "TU_DEVICE_ID"
 #define IOTF_DEVICE_TOKEN "TU_DEVICE_TOKEN"
 #define IOTF_THING_ID     "TU_THING_ID"
