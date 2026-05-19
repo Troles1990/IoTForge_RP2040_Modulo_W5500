@@ -5,12 +5,12 @@
 
 #include "trust_anchors.h"
 
-#define IOTF_BROKER       "mqtt.iaintegracion.space"
+#define IOTF_BROKER       ""
 #define IOTF_PORT         8883
-#define IOTF_DEVICE_ID    "ddbf5557-4105-492f-b00f-60a334210a5c"
-#define IOTF_DEVICE_TOKEN "df0f14ab66fb94e6478a0854922dbf69b3d8275099c334cb"
-#define IOTF_THING_ID     "a37fd9f8-dfa2-4362-aa07-3c51545920a5"
-#define IOTF_VAR_ID       "d7425629-5153-4b4d-bc73-518dc0e2d65a"
+#define IOTF_DEVICE_ID    "TU_DEVICE_ID"
+#define IOTF_DEVICE_TOKEN "TU_DEVICE_TOKEN"
+#define IOTF_THING_ID     "TU_THING_ID"
+#define IOTF_VAR_ID       "TU_VAR_ID"
 
 #define W5500_SCK   18
 #define W5500_MOSI  19
