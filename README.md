@@ -61,7 +61,7 @@ THING_ID (NODO)
 VARIABLE_ID
 ```
 
-## Paso 2 - Preparar certificado TLS (Si ya se encuentra el archivo trust_anchors.h pasar al paso 3).
+## Paso 2 - Preparar certificado TLS
 
 IoTForge usa MQTT con TLS en:
 
@@ -147,7 +147,124 @@ Actualiza tus credenciales IoTForge en los `#define`:
 #define IOTF_VAR_ID       "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
-## Paso 5 - Compilar y cargar
+## Paso 5 - Integrar tu propio programa
+
+La plantilla ya se encarga de la conexion Ethernet, TLS, MQTT, heartbeat y publicacion hacia IoTForge. El usuario solo debe agregar su propia logica en las zonas indicadas, sin modificar los bloques base de conexion.
+
+### Bloques requeridos
+
+Estos bloques son necesarios para que la conexion con IoTForge funcione:
+
+- Librerias: `SPI.h`, `Ethernet.h`, `SSLClient.h`, `PubSubClient.h`
+- Archivo TLS: `trust_anchors.h`
+- Credenciales IoTForge: `DEVICE_ID`, `DEVICE_TOKEN`, `THING_ID`, `VAR_ID`
+- Configuracion W5500: pines SPI, CS y RST
+- Cliente seguro: `EthernetClient`, `SSLClient`, `PubSubClient`
+- Funcion `ethernetInit()`
+- Funcion `mqttReconnect()`
+- Funcion `publishStatus()`
+- Llamada a `mqtt.loop()` dentro de `loop()`
+- Llamada a `Ethernet.maintain()` dentro de `loop()`
+- Heartbeat cada 30 segundos
+
+No se recomienda cambiar estos bloques al iniciar. Primero verifica que la plantilla conecte correctamente y despues agrega tu logica.
+
+### Donde declarar sensores, pines y variables
+
+Agrega tus pines, variables de sensores, estados de relevadores, contadores o banderas en la parte superior del programa, junto a las constantes.
+
+Ejemplos de lo que va en esa zona:
+
+- Pines de sensores
+- Pines de relevadores
+- Variables globales de lectura
+- Estados que se enviaran a IoTForge
+- Intervalos de publicacion propios
+
+### Donde configurar tu hardware
+
+Agrega la configuracion de tus sensores o actuadores dentro de `setup()`, despues de iniciar el puerto serial y antes o despues de `ethernetInit()`, segun lo que necesite tu hardware.
+
+Ejemplos:
+
+- `pinMode()` para entradas o salidas
+- Inicializacion de sensores I2C, SPI o UART
+- Configuracion de pantallas
+- Estado inicial de relevadores o salidas digitales
+
+La configuracion MQTT debe permanecer despues de crear los topics y antes de llamar a `mqttReconnect()`.
+
+### Donde leer sensores o ejecutar tu logica
+
+Agrega la logica principal dentro de `loop()`, despues de estas lineas base:
+
+```cpp
+if (!mqtt.connected()) {
+  mqttReconnect();
+}
+
+mqtt.loop();
+Ethernet.maintain();
+```
+
+Estas lineas mantienen viva la conexion con IoTForge. La logica del usuario debe ejecutarse despues para evitar bloquear MQTT.
+
+### Donde publicar datos a IoTForge
+
+La funcion que publica el valor de ejemplo es `publishVariable()`. Ahi se debe reemplazar el valor de demostracion por el valor real del sensor o del proceso.
+
+El topic usado para publicar variables es:
+
+```text
+iotforge/{THING_ID}/{VAR_ID}
+```
+
+Si se agregan mas variables, se recomienda crear un topic por cada variable y una funcion de publicacion para cada una.
+
+### Donde recibir comandos desde IoTForge
+
+Los mensajes recibidos desde IoTForge llegan a:
+
+```cpp
+mqttCallback(char* topic, byte* payload, unsigned int len)
+```
+
+En esa funcion se puede interpretar el mensaje recibido y ejecutar acciones como:
+
+- Encender o apagar una salida
+- Cambiar un setpoint
+- Actualizar un modo de operacion
+- Mover un actuador
+- Guardar un valor recibido
+
+La plantilla ya convierte el payload recibido a texto para facilitar su uso.
+
+### Recomendacion para tiempos
+
+Evita usar `delay()` largos dentro de `loop()`. Para tareas repetitivas usa `millis()`, como lo hace la plantilla con:
+
+```cpp
+HEARTBEAT_MS
+PUBLISH_MS
+```
+
+Esto permite que MQTT siga activo mientras tu programa ejecuta lecturas, publicaciones y control de salidas.
+
+### Resumen de zonas editables
+
+El usuario normalmente modifica estas partes:
+
+- Credenciales IoTForge en los `#define`
+- Pines adicionales de su hardware
+- Variables globales de sensores o actuadores
+- Configuracion de hardware dentro de `setup()`
+- Funcion `publishVariable()`
+- Funcion `mqttCallback()`
+- Logica principal dentro de `loop()`, despues de `mqtt.loop()`
+
+Los bloques de Ethernet, TLS, MQTT y heartbeat deben conservarse como base de comunicacion con IoTForge.
+
+## Paso 6 - Compilar y cargar
 
 1. Selecciona tu placa RP2040 en Arduino IDE
 2. Selecciona el puerto COM correcto
@@ -155,7 +272,7 @@ Actualiza tus credenciales IoTForge en los `#define`:
 4. Carga el firmware
 5. Abre el monitor serial a `115200` baudios
 
-## Paso 6 - Verificar funcionamiento
+## Paso 7 - Verificar funcionamiento
 
 En el monitor serial deberias ver:
 
