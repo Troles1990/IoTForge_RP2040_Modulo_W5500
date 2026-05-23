@@ -61,7 +61,7 @@ THING_ID (NODO)
 VARIABLE_ID
 ```
 
-## Paso 2 - Preparar certificado TLS
+## Paso 2 - Preparar certificado TLS (Los archivos ya estan generados asi que puedes pasar al punto 3)(Solo esta como guia el paso)
 
 IoTForge usa MQTT con TLS en:
 
