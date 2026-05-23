@@ -1,13 +1,13 @@
 /*
   RP2040 + W5500 -> IoTForge
-  Plantilla base MQTT TLS.
+  Plantilla base MQTT TLS con NTP (BearSSL Root X1).
 
   El usuario puede agregar su logica en las zonas marcadas como:
   "ZONA DEL USUARIO".
 
   Los bloques marcados como:
   "BLOQUE IOTFORGE - NO MOVER"
-  son necesarios para mantener Ethernet, TLS, MQTT y heartbeat funcionando.
+  son necesarios para mantener Ethernet, TLS, NTP, MQTT y heartbeat funcionando.
 */
 
 // ============================================================
@@ -15,11 +15,13 @@
 // ============================================================
 
 #include <SPI.h>
-#include <Ethernet.h>   // Usar Ethernet.h. Ethernet_Generic.h abre TCP, pero puede romper TLS con SSLClient.
+#include <Ethernet.h>     // Usar Ethernet.h. Ethernet_Generic.h abre TCP, pero puede romper TLS con SSLClient.
+#include <EthernetUdp.h>  // Requerido para NTP
+#include <NTPClient.h>    // Instalar: "NTPClient" de Fabrice Weinberg
 #include <SSLClient.h>
 #include <PubSubClient.h>
 
-#include "trust_anchors.h"  // Archivo generado con generate_trust_anchors.py
+#include "trust_anchors.h"  // Archivo generado con generate_trust_anchors.py (ISRG Root X1)
 
 // ============================================================
 // BLOQUE IOTFORGE - CREDENCIALES Y BROKER
@@ -76,7 +78,7 @@ SSLClient sslClient(ethClient, TAs, TAs_NUM, 0);  // Mantener TAs, TAs_NUM y 0 p
 PubSubClient mqtt(sslClient);
 
 unsigned long lastHeartbeatMs = 0;
-unsigned long lastPublishMs = 0;
+unsigned long lastPublishMs   = 0;
 
 char statusTopic[128];
 char varTopic[128];
@@ -102,6 +104,27 @@ void ethernetInit() {
 
   Serial.print(" IP: ");
   Serial.println(Ethernet.localIP());
+}
+
+// ============================================================
+// BLOQUE IOTFORGE - SINCRONIZACION NTP - NO MOVER
+// BearSSL (SSLClient) requiere tiempo real para validar
+// el certificado ISRG Root X1. Sin NTP el TLS falla.
+// ============================================================
+
+void ntpSync() {
+  EthernetUDP udp;
+  NTPClient timeClient(udp, "pool.ntp.org", 0, 60000);
+  Serial.print("NTP...");
+  timeClient.begin();
+  while (!timeClient.update()) {
+    timeClient.forceUpdate();
+    delay(500);
+  }
+  uint32_t epoch = timeClient.getEpochTime();
+  // Convertir epoch Unix a dias/segundos BearSSL (dias desde año 0)
+  sslClient.setVerificationTime(epoch / 86400 + 719528, epoch % 86400);
+  Serial.println(" OK");
 }
 
 // ============================================================
@@ -180,7 +203,7 @@ void mqttReconnect() {
       mqtt.subscribe(varTopic);
 
       lastHeartbeatMs = millis();
-      lastPublishMs = millis();
+      lastPublishMs   = millis();
     } else {
       Serial.print(" Error MQTT state: ");
       Serial.println(mqtt.state());
@@ -218,13 +241,14 @@ void setup() {
   // digitalWrite(RELAY_PIN, LOW);
 
   // ==========================================================
-  // BLOQUE IOTFORGE - INICIO RED Y MQTT - NO MOVER
+  // BLOQUE IOTFORGE - INICIO RED, NTP Y MQTT - NO MOVER
   // ==========================================================
 
   ethernetInit();
+  ntpSync();  // Sincronizar tiempo antes de TLS
 
   snprintf(statusTopic, sizeof(statusTopic), "iotforge/%s/status", IOTF_DEVICE_ID);
-  snprintf(varTopic, sizeof(varTopic), "iotforge/%s/%s", IOTF_THING_ID, IOTF_VAR_ID);
+  snprintf(varTopic,    sizeof(varTopic),    "iotforge/%s/%s",     IOTF_THING_ID, IOTF_VAR_ID);
 
   mqtt.setServer(IOTF_BROKER, IOTF_PORT);
   mqtt.setCallback(mqttCallback);
